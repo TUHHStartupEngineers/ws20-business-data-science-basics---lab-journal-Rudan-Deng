@@ -225,11 +225,23 @@ sales_by_year_state_tbl %>%
   )
 
 ```
-# My second post (note the order)
 
-Last compiled: `r Sys.Date()`
+# Data Acquisition
 
-I'm writing this tutorial going from the top down. And, this is how it will be printed. So, notice the second post is second in the list. If you want your most recent post to be at the top, then make a new post starting at the top. If you want the oldest first, do, then keep adding to the bottom
+## Challenge One
+Get some data via an API. 
+Working with Open Notify API, which opens up data on various NASA projects, below presents the peoples who are now in the space.
+```{r table_1}
+library(httr)
+library(jsonlite)
+
+resp <- GET("http://api.open-notify.org/astros.json")
+resp
+rawToChar(resp$content)
+data = fromJSON(rawToChar(resp$content))
+names(data)
+data$people
+```
 
 # Adding R stuff
 
