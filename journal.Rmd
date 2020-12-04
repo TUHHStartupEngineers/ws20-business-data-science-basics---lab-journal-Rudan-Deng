@@ -24,9 +24,8 @@ This is an `.Rmd` file. It is plain text with special features. Any time you wri
 
 Last compiled: `r Sys.Date()`
 
-## Challenge One
 
-### Sales by location
+## Sales by location
 
 Analyze the sales by state:
 Which state has the highest revenue?
@@ -133,7 +132,7 @@ sales_by_state_tbl %>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-### Sales by location and year
+## Sales by location and year
 
 Analyze the sales by location and year (facet_wrap).
 ```{r plot_1, fig.width=13, fig.height=7}
@@ -228,7 +227,7 @@ sales_by_year_state_tbl %>%
 
 # Data Acquisition
 
-## Challenge One
+## Get Data via API
 Get some data via an API. 
 Working with Open Notify API, which opens up data on various NASA projects, below presents the peoples who are now in the space.
 ```{r table_1}
@@ -242,7 +241,7 @@ data = fromJSON(rawToChar(resp$content))
 names(data)
 data$people
 ```
-## Chanllenge Two
+## MTB Category Price List of Rosebikes
 
 ```{r table_2}
 # WEBSCRAPING ----
