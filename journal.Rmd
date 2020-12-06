@@ -311,22 +311,347 @@ bike_mtb_tbl
 ```
 
 
-# Adding R stuff
+# Data Wrangling
 
-So far this is just a blog where you can write in plain text and serve your writing to a webpage. One of the main purposes of this lab journal is to record your progress learning R. The reason I am asking you to use this process is because you can both make a website, and a lab journal, and learn R all in R-studio. This makes everything really convenient and in the same place. 
+```{r calculation, eval=FALSE}
+#1. Libraries
 
-So, let's say you are learning how to make a histogram in R. For example, maybe you want to sample 100 numbers from a normal distribution with mean = 0, and standard deviation = 1, and then you want to plot a histogram. You can do this right here by using an r code block, like this:
+# Tidyverse
+library(tidyverse)
+library(vroom)
+
+# Data Table
+library(data.table)
+
+# Counter
+library(tictoc)
+
+#2. Import data
+# assignee
+col_types <- list(
+  id = col_character(NULL),
+  type = col_character(NULL),
+  name_first = col_character(NULL),
+  name_last = col_character(NULL),
+  organization = col_character(NULL)
+)
+
+assignee_tbl <- vroom(
+  file       = "/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/DS_101/00_data/assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+
+# patent_assignee
+col_types_pat <- list(
+  patent_id = col_double(),
+  type = col_character(NULL),
+  location_id = col_character(NULL)
+)
+
+patent_assignee_tbl <- vroom(
+  file       = "/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/DS_101/00_data/patent_assignee.tsv", 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
 
 
-```{r, eval = TRUE}
-numbers <- 1:1000
+setnames(patent_assignee_tbl, "assignee_id", "id")
 
-# This will print the first 10 elements of the vector numbers
-numbers[1:10]
 
-# This will plot a histogram of 100 random elements of the vector numbers
-hist(sample(numbers, 100, replace = T))
+# patent
+col_patent <- list(
+  patent_id = col_character(),
+  patent_type = col_character(),
+  number = col_character(),
+  country = col_character(),
+  date = col_date("%Y-%m-%d"),
+  abstract = col_character(),
+  title = col_character(),
+  kind = col_character(),
+  num_claims = col_double(),
+  filename = col_character(),
+  withdrawn = col_double()
+)
+
+patent_tbl <- vroom(
+  file       = "/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/DS_101/00_data/patent.tsv", 
+  delim      = "\t", 
+  col_names  = names(col_patent),
+  col_types  = col_patent,
+  na         = c("", "NA", "NULL")
+)
+
+# uspc
+col_uspc <- list(
+  uuid = col_character(),
+  patent_id = col_character(),
+  mainclass_id = col_character(),
+  subclass_id = col_character(),
+  sequence= col_double()
+)
+
+uspc_tbl <- vroom(
+  file       = "/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/DS_101/00_data/uspc.tsv", 
+  delim      = "\t", 
+  col_names  = names(col_uspc),
+  col_types  = col_uspc,
+  na         = c("", "NA", "NULL")
+)
+
+
+# 3. Convert to data table ----
+
+setDT(assignee_tbl)
+setDT(patent_assignee_tbl)
+setDT(patent_tbl)
+setDT(uspc_tbl)
+```
+
+```{r, calculation_1, eval = FALSE}
+# 4 DATA WRANGLING ----
+# merge the data via the id
+tic()
+combined_data <- merge(x = patent_assignee_tbl, y = assignee_tbl, 
+                       by    = "id", 
+                       all.x = TRUE, 
+                       all.y = FALSE)
+toc()
+
+# 1.Patent Dominance: What US company / corporation has the most patents? List the 10 US companies with the most assigned/granted patents.
+result1 <-combined_data %>% 
+  select("type","id", "organization") %>%
+  filter(type == 2) %>%
+  group_by(organization) %>%
+  summarise(num_of_patent = n()) %>%
+  ungroup() %>%
+  arrange(desc(num_of_patent)) %>%
+  head(10)
+
+write_rds(result1,"/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/outer_ws20-business-data-science-basics---lab-journal-Rudan-Deng/ws20-business-data-science-basics---lab-journal-Rudan-Deng/result1.rds")
+
+# 2.List the top 10 companies with the most new granted patents for 2019.
+tic()
+combined_data_2 <- merge(x = combined_data, y = patent_tbl, 
+                       by    = "patent_id", 
+                       all.x = TRUE, 
+                       all.y = FALSE)
+toc()
+
+result2 <-combined_data_2 %>%
+  filter(type ==2) %>%
+  filter(year(date)== 2019)%>%
+  group_by(organization)%>%
+  summarise(patent_num_2019=n())%>%
+  ungroup()%>%
+  arrange(desc(patent_num_2019))%>%
+  head(10)
+
+write_rds(result2,"/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/outer_ws20-business-data-science-basics---lab-journal-Rudan-Deng/ws20-business-data-science-basics---lab-journal-Rudan-Deng/result2.rds")
+
+# 3.What are the top 5 USPTO tech main classes?
+tic()
+combined_data_3 <- merge(x = uspc_tbl, y = combined_data, 
+                         by    = "patent_id", 
+                         all.x = TRUE, 
+                         all.y = FALSE)
+toc()
+setnames(combined_data_3, "location_id", "id")
+
+result3_1<-combined_data_3 %>%
+  select("mainclass_id", "id") %>%
+  filter(id %in% c("org_ONzMjdbZXiKfw4L0cXl6", 
+                   "org_eAKK85fawH0NS7AdXOig",
+                   "org_pCbqlmAg8wlWzoi18ITD",
+                   "org_yOSqt2KbCZQB2LRNpEKS",
+                   "org_rWEJSmVQtQg24yFJqVRb",
+                   "org_EccJQIigrq4WyGinD0b8",
+                   "org_g8U335TH48QmGJOIQnNl",
+                   "org_WX2Md025ShOVLD08FWsB",
+                   "org_f0ZEyISdLqKONLOyVOevn",
+                   "org_BWCG5LH9fZoKquGsGsrT")) %>%
+  group_by(mainclass_id)%>%
+  summarise(num_of_mainclass_id=n())%>%
+  ungroup()%>%
+  arrange(desc(num_of_mainclass_id))%>%
+  head(5)  
+  
+write_rds(result3_1,"/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/outer_ws20-business-data-science-basics---lab-journal-Rudan-Deng/ws20-business-data-science-basics---lab-journal-Rudan-Deng/result3_1.rds")
+
+
+```
+
+```{r result_1}
+# 1.Patent Dominance: What US company / corporation has the most patents? List the 10 US companies with the most assigned/granted patents.
+library(readr)
+library(data.table)
+result_1<-read_rds("/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/outer_ws20-business-data-science-basics---lab-journal-Rudan-Deng/ws20-business-data-science-basics---lab-journal-Rudan-Deng/result1.rds")
+result_1
+```
+
+```{r result_2}
+# 2.List the top 10 companies with the most new granted patents for 2019.
+library(readr)
+library(data.table)
+result_2<-read_rds("/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/outer_ws20-business-data-science-basics---lab-journal-Rudan-Deng/ws20-business-data-science-basics---lab-journal-Rudan-Deng/result2.rds")
+result_2
+```
+
+```{r result_3}
+# 3.What are the top 5 USPTO tech main classes?
+library(readr)
+library(data.table)
+result_3<-read_rds("/Users/rudandeng/Documents/05-ICS_Win2020/fund_DS_ws20/outer_ws20-business-data-science-basics---lab-journal-Rudan-Deng/ws20-business-data-science-basics---lab-journal-Rudan-Deng/result3_1.rds")
+result_3
+```
+
+# Data Visualization
+
+## Goal 1: Map the time course of the cumulative Covid-19 cases
+```{r plot_3, fig.width=10, fig.height=7}
+
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+library(scales)
+library(ggrepel)
+
+covid_data_tbl <- read_csv("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv")
+
+# Data Manipulation
+acc_covid_data_tbl <- covid_data_tbl %>%
+  
+  # Select relevant columns
+  select( month, year, dateRep, cases, countriesAndTerritories) %>%
+  filter(countriesAndTerritories %in% c("Germany", 
+                                        "United_Kingdom",
+                                        "France",
+                                        "Spain",
+                                        "United_States_of_America")) %>%
+  filter(year==2020) %>%
+  mutate(date=dmy(dateRep))%>%
+  group_by(countriesAndTerritories) %>%
+  # Sort by this column
+  arrange(countriesAndTerritories,date) %>%
+  mutate(cum_case_daily = cumsum(cases)) 
+
+tag <- acc_covid_data_tbl%>%
+  filter(date=="2020-11-30") %>%
+  filter(countriesAndTerritories%in% c("United_States_of_America","France"))%>%
+  mutate(cum_case_tag=scales::dollar(cum_case_daily, big.mark = '.',
+                                      decimal.mark =',',
+                                      prefix = '',
+                                      suffix =""))
+
+
+
+# Data Visualization
+
+acc_covid_data_tbl %>%
+  
+  # Canvas
+  ggplot(aes(date, cum_case_daily, color = countriesAndTerritories)) +
+  geom_line() +
+  geom_label_repel(data = tag,
+                   aes(label=cum_case_tag,fill=countriesAndTerritories),
+                   colour="white",fontface="bold",show.legend=FALSE,
+                   hjust = 2
+  )+
+  scale_y_continuous(labels = scales::unit_format(scale = 1e-6, 
+                                                  preix = "",
+                                                  suffix = "M"))+
+  scale_x_date(breaks = date_breaks("months"),labels = date_format("%B"))+
+  xlab('Year 2020') + ylab('Cumulative Cases') +
+  theme(legend.position = "bottom",
+        panel.background=element_rect(fill="black"),axis.text.x = element_text(angle = 45, hjust = 1))+
+  guides(col=guide_legend("Continent/Country"))
+```
+
+## Goal2: Visualize the distribution of the mortality rate (deaths / population) with geom_map(). 
+```{r plot_4, fig.width=10, fig.height=7}
+library(ggplot2)
+library(tidyverse)
+library(ggrepel)
+
+covid_data_tbl <- read_csv("https://opendata.ecdc.europa.eu/covid19/casedistribution/csv")
+
+world <- map_data("world")
+
+
+world %>%
+    mutate(Country = region) %>%
+    group_by(region) %>%
+    mutate(Country = case_when(
+      Country == 'USA' ~ 'USA',
+      Country == "United_Kingdom" ~ "UK",
+      Country == 'United_States_of_America' ~ 'USA',
+      Country == "Czechia" ~ "Czech Republic",
+      TRUE ~ Country
+    )) -> world
+
+data_country <- covid_data_tbl %>%   
+  select(countriesAndTerritories, dateRep,cases,deaths, popData2019) %>%
+  group_by(countriesAndTerritories) %>%
+  summarise(pop = mean(popData2019), deaths_sum = sum(deaths))%>%
+  ungroup()%>%
+  mutate(death_rate = deaths_sum/pop)
+              
+  
+
+colnames(data_country)[1] <- "Country"
+
+data_country %>%
+    mutate(Country = case_when(
+      Country == "United_Kingdom" ~ "UK",
+      Country == 'United_States_of_America' ~ 'USA',
+      Country == "Czechia" ~ "Czech Republic",
+      TRUE ~ Country
+      )) ->data_country
+
+new_df <- left_join(world, data_country, by = 'Country')
+
+
+world_map <-    
+  ggplot(new_df, aes(map_id = Country)) +
+    geom_map(aes(fill=death_rate), map=world, colour="grey",size = 0.1) +
+    expand_limits(x = world$long, y = world$lat) + 
+    scale_fill_distiller(palette = "Reds",direction= 1, 
+                         labels = scales::dollar_format(0.001,scale = 1e2, 
+                                          decimal.mark = ".", 
+                                          prefix = "",
+                                          suffix = "%"),
+                         breaks=c(seq(0,0.0014,0.0002))) +
+      
+labs(
+  title = 'Confirmed CVOID-19 deaths relative to the size of the population',
+  subtitle = "More than 1.4 Million confirmed COVID-19 deaths worldwide",
+  caption = "Date: 06/12/2020",
+  x = "",
+  y = ""
+)+
+theme(panel.grid=element_line(color = "grey"),
+      panel.background=element_rect(fill="black"),
+      panel.border = element_blank(),
+      axis.text = element_blank())
+world_map
 ```
 
 
-When you knit this R Markdown document, you will see that the histogram is printed to the page, along with the R code. This document can be set up to hide the R code in the webpage, just delete the comment (hashtag) from the cold folding option in the yaml header up top. For purposes of letting yourself see the code, and me see the code, best to keep it the way that it is. You'll learn that all of these things and more can be customized in each R code block.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
